@@ -1,0 +1,1 @@
+{"version":3,"file":"audio-data.d.ts","sourceRoot":"","sources":["../../src/core/audio-data.ts"],"names":[],"mappings":"AAAA,qBAAa,SAAS;IACpB,QAAQ,EAAE,YAAY,EAAE,CAAC;IACzB,EAAE,EAAE,MAAM,CAAC;gBAEC,QAAQ,EAAE,YAAY,EAAE,EAAE,EAAE,EAAE,MAAM;IAiBhD,QAAQ,IAAI,YAAY;IAcxB,aAAa,CAAC,OAAO,EAAE,YAAY,GAAG,WAAW;CAelD"}

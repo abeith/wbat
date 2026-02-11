@@ -1,0 +1,1058 @@
+#+TITLE: Client-side unit tests
+#+PROPERTY: header-args:r :dir (project-root (project-current t))
+
+This document was used to create examples of the main use cases of this package to be deployed via GitHub Pages for testing. This has been deprecated in favour of tests served via the test-server package.
+
+* Main page
+
+#+begin_src html
+  <html>
+    <head></head>
+    <body>
+      <div><a href="./auditoryToolbox">Auditory Toolbox demo</a></div>
+      <div><a href="./unittests">Unit Tests</a></div>
+    </body>
+  </html>
+#+end_src
+
+#+begin_src html
+  <html>
+    <head></head>
+    <body>
+      <div><a href="..">..</a></div>
+      <div><a href="latency.html">Latency Test</a></div>
+      <div><a href="pitch-detect.html">Pitch Detection Test</a></div>
+      <div><a href="play.html">Audio Player Test</a></div>
+    </body>
+  </html>  
+#+end_src
+
+* Play
+
+** front-end
+
+#+begin_src html
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Audio player test</title>
+    </head>
+    <body>
+      <h1>Audio player test</h1>
+      <div><a href=".">.</a></div>
+      <div id="test-container"></div>
+      <br>
+      <div><button id="play-file">Play wav file</button><span> Note: This is actually using virtualLoopback because I want to create AudioData</span></div>
+      <br>
+      <button id="play-audio-data">Play AudioData</button>
+      <br>
+      <div id="results"></div>
+      <br>
+      <script src="play.js" type="module"></script>
+    </body>
+  </html>
+#+end_src
+
+#+begin_src js
+  import { AuditoryToolbox } from './AuditoryToolbox.js';
+
+  const auditory = new AuditoryToolbox();
+  const testContainer = document.getElementById('test-container');
+  const playFileButton = document.getElementById('play-file');
+  const playAudioDataButton = document.getElementById('play-audio-data');
+  const results = document.getElementById('results');
+  const canvas = document.getElementById('spectrogramCanvas');
+
+  let audioData;
+
+  // AudioData is created by virtualLoopback
+  playAudioDataButton.style.display = 'none'
+
+  const playFile = async () => {
+      audioData = await auditory.virtualLoopback('../sounds/a4.wav');
+      playAudioDataButton.style.display = 'block'
+      console.log(audioData);
+  }
+
+  const playAudioData = async () => {
+      const res = await auditory.play(audioData);
+      console.log(res);
+  }
+
+  playFileButton.addEventListener('click', playFile);
+
+  playAudioDataButton.addEventListener('click', playAudioData);
+
+#+end_src
+
+
+
+* Latency test
+
+** Stimuli
+
+#+NAME: make-chirp
+#+begin_src R :vars sweep=4 delay=100
+  chirp_file <- sprintf('./sounds/chirp%i.wav', sweep)
+  wav <- tuneR::readWave(chirp_file)
+  sig <- wav@left
+  ## 100 ms delay
+  padding <- rep(0, round(wav@samp.rate * delay / 1e3))
+  echo <- c(padding, sig)[seq_along(sig)]
+  wav@stereo <- TRUE
+  wav@right <- echo
+  out_path <- sprintf('./sounds/chirp%i_delay%i.wav', sweep, delay)
+  tuneR::writeWave(wav, out_path)
+  print(out_path)
+#+end_src
+
+#+RESULTS: make-chirp
+
+
+*** 4kHz: 100 ms
+
+#+CALL: make-chirp(sweep=4, delay=100)
+
+#+RESULTS:
+: ./sounds/chirp4_delay100.wav
+
+*** 8kHz: 100 ms
+
+#+CALL: make-chirp(sweep=8, delay=100)
+
+#+RESULTS:
+: ./sounds/chirp8_delay100.wav
+
+*** 16kHz: 100 ms
+
+#+CALL: make-chirp(sweep=16, delay=100)
+
+#+RESULTS:
+: ./sounds/chirp16_delay100.wav
+
+** Deployment
+
+This is the first use case I will test. It will be deployed in 3 stages. This first is to deploy a working example via GitHub Pages that I can verify manually. Then I will add a download button to store JSON data for offline testing. Finally, I will deploy an API to handle unit tests.
+
+- [X] Interactive test
+- [X] Offline unit test
+- [X] Online unit test
+
+** front-end
+
+#+begin_src html
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Latency unit test</title>
+    </head>
+    <body>
+      <h1>Latency unit test</h1>
+      <div><a href=".">.</a></div>
+      <div id="test-container"></div>
+      <br>
+      <button id="run">Run test</button>
+      <br>
+      <button id="run-sim">Run simulated test</button>
+      <br>
+      <div id="results"></div>
+      <br>
+      <canvas id="spectrogramCanvas"></canvas>
+      <br>
+      <script src="latency.js" type="module"></script>
+    </body>
+  </html>
+#+end_src
+
+#+begin_src js
+  import { AuditoryToolbox } from './AuditoryToolbox.js';
+
+  const auditory = new AuditoryToolbox();
+  const testContainer = document.getElementById('test-container');
+  const runButton = document.getElementById('run');
+  const runSimButton = document.getElementById('run-sim');
+  const results = document.getElementById('results');
+  const canvas = document.getElementById('spectrogramCanvas');
+
+  const simulateLatencyTest = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const sweep = params.get('sweep') || 4;
+      const delay = params.get('delay') || 100;
+      const pitchTrack = await auditory.fmcw(`../sounds/chirp${sweep}_delay${delay}.wav`);
+      const detectedDelay = pitchTrack.mode / sweep;
+      window.unitTestValue = pitchTrack.mode;
+      results.innerText = `Delay: ${delay} ms\nDetected delay: ${detectedDelay} ms`;
+      auditory.plotSpectrogram(pitchTrack, canvas, 800, 400);
+  }
+
+  const runLatencyTest = async () => {
+      let pitchTrack = await auditory.latencyTest('../sounds/chirp4.wav');
+      const median_freq = Math.round(pitchTrack.median * 100)/100; // 
+      const chirp_sweep = 4e3;
+      const delay = Math.round(100 * 1000 * pitchTrack.mode / chirp_sweep)/100; // Assumes a 1s chirp
+      results.innerText = `Peak freq (mode): ${pitchTrack.mode}Hz\nMedian pitch: ${median_freq}Hz\nDelay: ${delay}ms`;
+
+      auditory.plotSpectrogram(pitchTrack, canvas, 800, 400);
+      console.log(pitchTrack);
+  }
+
+  runButton.addEventListener('click', runLatencyTest);
+
+  runSimButton.addEventListener('click', simulateLatencyTest);
+
+#+end_src
+
+** Offline latency calculation
+
+First test was created with audioBufferToWav from audiobuffer-to-wav. It worked but didn't allow metadata to be included.
+
+#+begin_src R :results output graphics file :file data/plots/en1z.png :height 350 :width 1000
+
+  library(tidyverse)
+  library(retimer)
+  library(patchwork)
+
+  ## Read file
+  wav_file <- list.files('./data', 'en1z', full.names = TRUE)
+  wav <- tuneR::readWave(wav_file)
+
+  stim <- wav@left
+  echo <- wav@right
+  mix <- stim * echo
+  fs <- wav@samp.rate
+
+  spec_stim <- spectrogram(stim, fs, method = "gsignal")
+  spec_echo <- spectrogram(echo, fs, method = "gsignal")
+  spec_mix <- spectrogram(mix, fs, method = "gsignal")
+
+  df_spec <- bind_rows(
+    stim = spec_stim,
+    echo = spec_echo,
+    mix = spec_mix,
+    .id = 'source') |>
+    mutate(source = factor(source, levels = c("stim", "echo", "mix")))
+
+  ## Calculate the latency
+  df_pitch_track <- df_spec |>
+    summarise(f = f[which.max(amp)], .by = c(source, t))
+  mode_table <- df_pitch_track |>
+    filter(source == 'mix') |>
+    pull(f) |>
+    table()
+  mix_peak <- names(which.max(mode_table)) |> as.numeric()
+  delay <- mix_peak / 4e3
+
+  ## Guide lines
+  df_chirp <- tibble(t = seq(0, 1, length.out = 100), f = 4e3 * t)
+  df_echo <- df_chirp |> mutate(t = t + delay)
+
+  ## Show that chirp is from 0 to 4kHz
+  p_stim <- df_spec |>
+    filter(source == 'stim') |>
+    ggplot() +
+    geom_raster(aes(t, f, fill = amp), show.legend = FALSE) +
+    geom_line(data = df_chirp, aes(t, f), colour = 2) +
+    scale_fill_viridis_c() +
+    coord_cartesian(xlim = c(0, 1), ylim = c(0, 4e3))
+
+  ## Show that echo is delayed by the calculated latency
+  p_echo <- df_spec |>
+    filter(source == 'echo') |>
+    ggplot() +
+    geom_raster(aes(t, f, fill = amp), show.legend = FALSE) +
+    geom_line(data = df_echo, aes(t, f), colour = 2) +
+    scale_fill_viridis_c() +
+    coord_cartesian(xlim = c(0, 1), ylim = c(0, 4e3))
+
+  ## Show the frequency peak used to calculate latency
+  p_mix <- df_spec |>
+    filter(source == 'mix') |>
+    ggplot() +
+    geom_raster(aes(t, f, fill = amp), show.legend = FALSE) +
+    geom_hline(yintercept = mix_peak, colour = 2) +
+    scale_fill_viridis_c() +
+    coord_cartesian(xlim = c(0, 1), ylim = c(0, 4e3))
+
+  ## Plot them together
+  plot_title <- sprintf("RTL = %0.0fms", delay * 1e3)
+  p_stim + p_echo + p_mix + plot_annotation(title = plot_title)
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/en1z.png]]
+
+I then tested with WaveFile from wavefile which allows metadata tags to be added. Offline latency test still works.
+
+#+begin_src R :results output graphics file :file data/plots/u194.png :height 350 :width 1000
+
+  library(tidyverse)
+  library(retimer)
+  library(patchwork)
+
+  ## Read file
+  wav_file <- list.files('./data', 'u194', full.names = TRUE)
+  wav <- tuneR::readWave(wav_file)
+
+  stim <- wav@left
+  echo <- wav@right
+  mix <- stim * echo
+  fs <- wav@samp.rate
+
+  spec_stim <- spectrogram(stim, fs, method = "gsignal")
+  spec_echo <- spectrogram(echo, fs, method = "gsignal")
+  spec_mix <- spectrogram(mix, fs, method = "gsignal")
+
+  df_spec <- bind_rows(
+    stim = spec_stim,
+    echo = spec_echo,
+    mix = spec_mix,
+    .id = 'source') |>
+    mutate(source = factor(source, levels = c("stim", "echo", "mix")))
+
+  ## Calculate the latency
+  df_pitch_track <- df_spec |>
+    summarise(f = f[which.max(amp)], .by = c(source, t))
+  mode_table <- df_pitch_track |>
+    filter(source == 'mix') |>
+    pull(f) |>
+    table()
+  mix_peak <- names(which.max(mode_table)) |> as.numeric()
+  delay <- mix_peak / 4e3
+
+  ## Guide lines
+  df_chirp <- tibble(t = seq(0, 1, length.out = 100), f = 4e3 * t)
+  df_echo <- df_chirp |> mutate(t = t + delay)
+
+  ## Show that chirp is from 0 to 4kHz
+  p_stim <- df_spec |>
+    filter(source == 'stim') |>
+    ggplot() +
+    geom_raster(aes(t, f, fill = amp), show.legend = FALSE) +
+    geom_line(data = df_chirp, aes(t, f), colour = 2) +
+    scale_fill_viridis_c() +
+    coord_cartesian(xlim = c(0, 1), ylim = c(0, 4e3))
+
+  ## Show that echo is delayed by the calculated latency
+  p_echo <- df_spec |>
+    filter(source == 'echo') |>
+    ggplot() +
+    geom_raster(aes(t, f, fill = amp), show.legend = FALSE) +
+    geom_line(data = df_echo, aes(t, f), colour = 2) +
+    scale_fill_viridis_c() +
+    coord_cartesian(xlim = c(0, 1), ylim = c(0, 4e3))
+
+  ## Show the frequency peak used to calculate latency
+  p_mix <- df_spec |>
+    filter(source == 'mix') |>
+    ggplot() +
+    geom_raster(aes(t, f, fill = amp), show.legend = FALSE) +
+    geom_hline(yintercept = mix_peak, colour = 2) +
+    scale_fill_viridis_c() +
+    coord_cartesian(xlim = c(0, 1), ylim = c(0, 4e3))
+
+  ## Plot them together
+  plot_title <- sprintf("RTL = %0.0fms", delay * 1e3)
+  p_stim + p_echo + p_mix + plot_annotation(title = plot_title)
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/u194.png]]
+
+Metadata can be read in python. 
+
+#+begin_src python :results graphics file value :file data/plots/u1940_py.png :width 1000
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  w = WaveReader("data/u1940cxyl39.wav")
+
+  user_agent = w.metadata.artist
+  meta_comment = w.metadata.comment
+
+  y, sr = librosa.load("data/u1940cxyl39.wav", mono = False)
+
+  y_stim = y[0]
+  y_echo = y[1]
+  y_mix = y_stim * y_echo
+
+  S_stim = np.abs(librosa.stft(y_stim))
+  S_echo = np.abs(librosa.stft(y_echo))
+  S_mix = np.abs(librosa.stft(y_mix))
+
+  pitch_track = np.zeros(S_mix.shape[1])
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  for i in range(S_mix.shape[1]):
+      pitch_track[i] = f_scale[np.argmax(S_mix[:, i])]
+
+  f_table = np.unique(pitch_track, return_counts = True)
+  f_max = f_table[0][np.argmax(f_table[1])]
+
+  delay = f_max / 4e3
+
+  fig, (ax_stim, ax_echo, ax_mix) = plt.subplots(1, 3)
+  img_stim = librosa.display.specshow(
+      librosa.amplitude_to_db(S_stim,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_stim)
+  img_echo = librosa.display.specshow(
+      librosa.amplitude_to_db(S_echo,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_echo)
+  img_mix = librosa.display.specshow(
+      librosa.amplitude_to_db(S_mix,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_mix)
+
+  ax_stim.set_ylim(0, 4e3)
+  ax_echo.set_ylim(0, 4e3)
+  ax_mix.set_ylim(0, 4e3)
+  ax_stim.set_xlim(0, 1)
+  ax_echo.set_xlim(0, 1)
+  ax_mix.set_xlim(0, 1)
+    
+  ax_mix.hlines(f_max, 0, 1, 'red', ls = '--', lw = 1)
+  ax_stim.axline((0,0), (1,4e3), linewidth = 1, color = 'red', ls = '--')
+  ax_echo.axline((delay,0), (1+delay,4e3), linewidth = 1, color = 'red', ls = '--')
+  
+  fig.suptitle('Delay = {:0.0f}ms Metadata: {:s} \n {:s}'.format(1e3 * delay, meta_comment, user_agent), size = 'small')
+  fig.set_size_inches(10, 3.5)
+
+  return fig
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/u1940_py.png]]
+
+Alternative approach to plotting in python
+
+#+begin_src python :results value file link
+  import pandas as pd
+  from plotnine import ggplot, aes, geom_raster, ggsave, ylim, xlim
+
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  w = WaveReader("data/u1940cxyl39.wav")
+
+  y, sr = librosa.load("data/u1940cxyl39.wav", mono = False)
+
+  y_mix = y[0] * y[1]
+  S_mix = np.abs(librosa.stft(y_mix))
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  rows, cols = np.indices(S_mix.shape)
+  df = pd.DataFrame({
+      'f': f_scale[rows.flatten()],
+      't': librosa.frames_to_time(cols.flatten(), sr = sr, n_fft = 2048),
+      'amp': S_mix.flatten()
+  })
+
+  p = ggplot(df)
+  p += geom_raster(aes(x = 't', y = 'f', fill = 'amp'), show_legend = False)
+  p += xlim((0, 1))
+  p += ylim((0, 4e3))
+
+  filename = 'data/plots/pyggtest.png'
+  ggsave(p, filename=filename)
+  return filename
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/pyggtest.png]]
+
+Test with multi-channel worklet. Longer latencies than with the previous examples. Possible reasons:
+
+- Added complexity of multi-channel worklet. Hopefully not the case!
+- Local testing. I started debugging on dev machine and ran from python http.server rather than GH Pages.
+  - Something about the way http.server works?
+  - Different server adds a mic stream.
+
+#+begin_src python :results graphics file value :file data/plots/mno9_py.png
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  wav_file = "data/mno9oc7kiio.wav"
+
+  w = WaveReader(wav_file)
+
+  user_agent = w.metadata.artist
+  meta_comment = w.metadata.comment
+
+  y, sr = librosa.load(wav_file, mono = False)
+
+  y_stim = y[0]
+  y_echo = y[1]
+  y_mix = y_stim * y_echo
+
+  S_stim = np.abs(librosa.stft(y_stim))
+  S_echo = np.abs(librosa.stft(y_echo))
+  S_mix = np.abs(librosa.stft(y_mix))
+
+  pitch_track = np.zeros(S_mix.shape[1])
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  for i in range(S_mix.shape[1]):
+      pitch_track[i] = f_scale[np.argmax(S_mix[:, i])]
+
+  f_table = np.unique(pitch_track, return_counts = True)
+  f_max = f_table[0][np.argmax(f_table[1])]
+
+  delay = f_max / 4e3
+
+  fig, (ax_stim, ax_echo, ax_mix) = plt.subplots(1, 3)
+  img_stim = librosa.display.specshow(
+      librosa.amplitude_to_db(S_stim,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_stim)
+  img_echo = librosa.display.specshow(
+      librosa.amplitude_to_db(S_echo,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_echo)
+  img_mix = librosa.display.specshow(
+      librosa.amplitude_to_db(S_mix,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_mix)
+
+  ax_stim.set_ylim(0, 4e3)
+  ax_echo.set_ylim(0, 4e3)
+  ax_mix.set_ylim(0, 4e3)
+  ax_stim.set_xlim(0, 1)
+  ax_echo.set_xlim(0, 1)
+  ax_mix.set_xlim(0, 1)
+    
+  ax_mix.hlines(f_max, 0, 1, 'red', ls = '--', lw = 1)
+  ax_stim.axline((0,0), (1,4e3), linewidth = 1, color = 'red', ls = '--')
+  ax_echo.axline((delay,0), (1+delay,4e3), linewidth = 1, color = 'red', ls = '--')
+
+  fig.suptitle('Delay = {:0.0f}ms Metadata: {:s} \n {:s}'.format(1e3 * delay, meta_comment, user_agent), size = 'small')
+  fig.set_size_inches(10, 3.5)
+
+  return fig
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/mno9_py.png]]
+
+Looks like it was having 2 mic streams. Down to 100ms after closing GH Pages tab.
+
+#+begin_src python :results graphics file value :file data/plots/ka3p_py.png
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  wav_file = "data/ka3pvm9hnw.wav"
+
+  w = WaveReader(wav_file)
+
+  user_agent = w.metadata.artist
+  meta_comment = w.metadata.comment
+
+  y, sr = librosa.load(wav_file, mono = False)
+
+  y_stim = y[0]
+  y_echo = y[1]
+  y_mix = y_stim * y_echo
+
+  S_stim = np.abs(librosa.stft(y_stim))
+  S_echo = np.abs(librosa.stft(y_echo))
+  S_mix = np.abs(librosa.stft(y_mix))
+
+  pitch_track = np.zeros(S_mix.shape[1])
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  for i in range(S_mix.shape[1]):
+      pitch_track[i] = f_scale[np.argmax(S_mix[:, i])]
+
+  f_table = np.unique(pitch_track, return_counts = True)
+  f_max = f_table[0][np.argmax(f_table[1])]
+
+  delay = f_max / 4e3
+
+  fig, (ax_stim, ax_echo, ax_mix) = plt.subplots(1, 3)
+  img_stim = librosa.display.specshow(
+      librosa.amplitude_to_db(S_stim,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_stim)
+  img_echo = librosa.display.specshow(
+      librosa.amplitude_to_db(S_echo,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_echo)
+  img_mix = librosa.display.specshow(
+      librosa.amplitude_to_db(S_mix,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_mix)
+
+  ax_stim.set_ylim(0, 4e3)
+  ax_echo.set_ylim(0, 4e3)
+  ax_mix.set_ylim(0, 4e3)
+  ax_stim.set_xlim(0, 1)
+  ax_echo.set_xlim(0, 1)
+  ax_mix.set_xlim(0, 1)
+    
+  ax_mix.hlines(f_max, 0, 1, 'red', ls = '--', lw = 1)
+  ax_stim.axline((0,0), (1,4e3), linewidth = 1, color = 'red', ls = '--')
+  ax_echo.axline((delay,0), (1+delay,4e3), linewidth = 1, color = 'red', ls = '--')
+
+  fig.suptitle('Delay = {:0.0f}ms Metadata: {:s} \n {:s}'.format(1e3 * delay, meta_comment, user_agent), size = 'small')
+  fig.set_size_inches(10, 3.5)
+
+  return fig
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/ka3p_py.png]]
+
+Now trying with a merger node so that I only need 1 worklet.
+
+#+begin_src python :results graphics file value :file data/plots/1ssy_py.png
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  wav_file = "data/1ssy4xflkic.wav"
+
+  w = WaveReader(wav_file)
+
+  user_agent = w.metadata.artist
+  meta_comment = w.metadata.comment
+
+  y, sr = librosa.load(wav_file, mono = False)
+
+  y_stim = y[0]
+  y_echo = y[1]
+  y_mix = y_stim * y_echo
+
+  S_stim = np.abs(librosa.stft(y_stim))
+  S_echo = np.abs(librosa.stft(y_echo))
+  S_mix = np.abs(librosa.stft(y_mix))
+
+  pitch_track = np.zeros(S_mix.shape[1])
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  for i in range(S_mix.shape[1]):
+      pitch_track[i] = f_scale[np.argmax(S_mix[:, i])]
+
+  f_table = np.unique(pitch_track, return_counts = True)
+  f_max = f_table[0][np.argmax(f_table[1])]
+
+  delay = f_max / 4e3
+
+  fig, (ax_stim, ax_echo, ax_mix) = plt.subplots(1, 3)
+  img_stim = librosa.display.specshow(
+      librosa.amplitude_to_db(S_stim,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_stim)
+  img_echo = librosa.display.specshow(
+      librosa.amplitude_to_db(S_echo,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_echo)
+  img_mix = librosa.display.specshow(
+      librosa.amplitude_to_db(S_mix,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_mix)
+
+  ax_stim.set_ylim(0, 4e3)
+  ax_echo.set_ylim(0, 4e3)
+  ax_mix.set_ylim(0, 4e3)
+  ax_stim.set_xlim(0, 1)
+  ax_echo.set_xlim(0, 1)
+  ax_mix.set_xlim(0, 1)
+    
+  ax_mix.hlines(f_max, 0, 1, 'red', ls = '--', lw = 1)
+  ax_stim.axline((0,0), (1,4e3), linewidth = 1, color = 'red', ls = '--')
+  ax_echo.axline((delay,0), (1+delay,4e3), linewidth = 1, color = 'red', ls = '--')
+
+  fig.suptitle('Delay = {:0.0f}ms Metadata: {:s} \n {:s}'.format(1e3 * delay, meta_comment, user_agent), size = 'small')
+  fig.set_size_inches(10, 3.5)
+
+  return fig
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/1ssy_py.png]]
+
+virtualLoopback now returns a promise of an array of Float32Arrays but download is still being handled as a side-effect.
+
+#+begin_src python :results graphics file value :file data/plots/dl8r_py.png
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  wav_file = "data/dl8rmi5oin.wav"
+
+  w = WaveReader(wav_file)
+
+  user_agent = w.metadata.artist
+  meta_comment = w.metadata.comment
+
+  y, sr = librosa.load(wav_file, mono = False)
+
+  y_stim = y[0]
+  y_echo = y[1]
+  y_mix = y_stim * y_echo
+
+  S_stim = np.abs(librosa.stft(y_stim))
+  S_echo = np.abs(librosa.stft(y_echo))
+  S_mix = np.abs(librosa.stft(y_mix))
+
+  pitch_track = np.zeros(S_mix.shape[1])
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  for i in range(S_mix.shape[1]):
+      pitch_track[i] = f_scale[np.argmax(S_mix[:, i])]
+
+  f_table = np.unique(pitch_track, return_counts = True)
+  f_max = f_table[0][np.argmax(f_table[1])]
+
+  delay = f_max / 4e3
+
+  fig, (ax_stim, ax_echo, ax_mix) = plt.subplots(1, 3)
+  img_stim = librosa.display.specshow(
+      librosa.amplitude_to_db(S_stim,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_stim)
+  img_echo = librosa.display.specshow(
+      librosa.amplitude_to_db(S_echo,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_echo)
+  img_mix = librosa.display.specshow(
+      librosa.amplitude_to_db(S_mix,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_mix)
+
+  ax_stim.set_ylim(0, 4e3)
+  ax_echo.set_ylim(0, 4e3)
+  ax_mix.set_ylim(0, 4e3)
+  ax_stim.set_xlim(0, 1)
+  ax_echo.set_xlim(0, 1)
+  ax_mix.set_xlim(0, 1)
+    
+  ax_mix.hlines(f_max, 0, 1, 'red', ls = '--', lw = 1)
+  ax_stim.axline((0,0), (1,4e3), linewidth = 1, color = 'red', ls = '--')
+  ax_echo.axline((delay,0), (1+delay,4e3), linewidth = 1, color = 'red', ls = '--')
+
+  fig.suptitle('Delay = {:0.0f}ms Metadata: {:s} \n {:s}'.format(1e3 * delay, meta_comment, user_agent), size = 'small')
+  fig.set_size_inches(10, 3.5)
+
+  return fig
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/dl8r_py.png]]
+
+Works on iPhone.
+
+#+begin_src python :results graphics file value :file data/plots/asot_py.png
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  wav_file = "data/asotqhzb9uo.wav"
+
+  w = WaveReader(wav_file)
+
+  user_agent = w.metadata.artist
+  meta_comment = w.metadata.comment
+
+  y, sr = librosa.load(wav_file, mono = False)
+
+  y_stim = y[0]
+  y_echo = y[1]
+  y_mix = y_stim * y_echo
+
+  S_stim = np.abs(librosa.stft(y_stim))
+  S_echo = np.abs(librosa.stft(y_echo))
+  S_mix = np.abs(librosa.stft(y_mix))
+
+  pitch_track = np.zeros(S_mix.shape[1])
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  for i in range(S_mix.shape[1]):
+      pitch_track[i] = f_scale[np.argmax(S_mix[:, i])]
+
+  f_table = np.unique(pitch_track, return_counts = True)
+  f_max = f_table[0][np.argmax(f_table[1])]
+
+  delay = f_max / 4e3
+
+  fig, (ax_stim, ax_echo, ax_mix) = plt.subplots(1, 3)
+  img_stim = librosa.display.specshow(
+      librosa.amplitude_to_db(S_stim,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_stim)
+  img_echo = librosa.display.specshow(
+      librosa.amplitude_to_db(S_echo,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_echo)
+  img_mix = librosa.display.specshow(
+      librosa.amplitude_to_db(S_mix,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_mix)
+
+  ax_stim.set_ylim(0, 4e3)
+  ax_echo.set_ylim(0, 4e3)
+  ax_mix.set_ylim(0, 4e3)
+  ax_stim.set_xlim(0, 1)
+  ax_echo.set_xlim(0, 1)
+  ax_mix.set_xlim(0, 1)
+    
+  ax_mix.hlines(f_max, 0, 1, 'red', ls = '--', lw = 1)
+  ax_stim.axline((0,0), (1,4e3), linewidth = 1, color = 'red', ls = '--')
+  ax_echo.axline((delay,0), (1+delay,4e3), linewidth = 1, color = 'red', ls = '--')
+
+  fig.suptitle('Delay = {:0.0f}ms Metadata: {:s} \n {:s}'.format(1e3 * delay, meta_comment, user_agent), size = 'small')
+  fig.set_size_inches(10, 3.5)
+
+  return fig
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/asot_py.png]]
+
+Re-running after adding eslint and prettier.
+
+#+begin_src python :results graphics file value :file data/plots/dya7_py.png
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  wav_file = "data/dya7toiokdn.wav"
+
+  w = WaveReader(wav_file)
+
+  user_agent = w.metadata.artist
+  meta_comment = w.metadata.comment
+
+  y, sr = librosa.load(wav_file, mono = False)
+
+  y_stim = y[0]
+  y_echo = y[1]
+  y_mix = y_stim * y_echo
+
+  S_stim = np.abs(librosa.stft(y_stim))
+  S_echo = np.abs(librosa.stft(y_echo))
+  S_mix = np.abs(librosa.stft(y_mix))
+
+  pitch_track = np.zeros(S_mix.shape[1])
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  for i in range(S_mix.shape[1]):
+      pitch_track[i] = f_scale[np.argmax(S_mix[:, i])]
+
+  f_table = np.unique(pitch_track, return_counts = True)
+  f_max = f_table[0][np.argmax(f_table[1])]
+
+  delay = f_max / 4e3
+
+  fig, (ax_stim, ax_echo, ax_mix) = plt.subplots(1, 3)
+  img_stim = librosa.display.specshow(
+      librosa.amplitude_to_db(S_stim,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_stim)
+  img_echo = librosa.display.specshow(
+      librosa.amplitude_to_db(S_echo,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_echo)
+  img_mix = librosa.display.specshow(
+      librosa.amplitude_to_db(S_mix,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_mix)
+
+  ax_stim.set_ylim(0, 4e3)
+  ax_echo.set_ylim(0, 4e3)
+  ax_mix.set_ylim(0, 4e3)
+  ax_stim.set_xlim(0, 1)
+  ax_echo.set_xlim(0, 1)
+  ax_mix.set_xlim(0, 1)
+    
+  ax_mix.hlines(f_max, 0, 1, 'red', ls = '--', lw = 1)
+  ax_stim.axline((0,0), (1,4e3), linewidth = 1, color = 'red', ls = '--')
+  ax_echo.axline((delay,0), (1+delay,4e3), linewidth = 1, color = 'red', ls = '--')
+
+  fig.suptitle('Delay = {:0.0f}ms Metadata: {:s} \n {:s}'.format(1e3 * delay, meta_comment, user_agent), size = 'small')
+  fig.set_size_inches(10, 3.5)
+
+  return fig
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/dya7_py.png]]
+
+Testing commit metadata
+
+#+begin_src python :results graphics file value :file data/plots/i5cu_py.png
+  import librosa
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from wavefile import WaveReader
+
+  wav_file = "data/i5cuh5dovii.wav"
+
+  w = WaveReader(wav_file)
+
+  user_agent = w.metadata.artist
+  meta_comment = w.metadata.comment
+
+  y, sr = librosa.load(wav_file, mono = False)
+
+  y_stim = y[0]
+  y_echo = y[1]
+  y_mix = y_stim * y_echo
+
+  S_stim = np.abs(librosa.stft(y_stim))
+  S_echo = np.abs(librosa.stft(y_echo))
+  S_mix = np.abs(librosa.stft(y_mix))
+
+  pitch_track = np.zeros(S_mix.shape[1])
+  f_scale = librosa.fft_frequencies(sr = sr, n_fft = 2048)
+
+  for i in range(S_mix.shape[1]):
+      pitch_track[i] = f_scale[np.argmax(S_mix[:, i])]
+
+  f_table = np.unique(pitch_track, return_counts = True)
+  f_max = f_table[0][np.argmax(f_table[1])]
+
+  delay = f_max / 4e3
+
+  fig, (ax_stim, ax_echo, ax_mix) = plt.subplots(1, 3)
+  img_stim = librosa.display.specshow(
+      librosa.amplitude_to_db(S_stim,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_stim)
+  img_echo = librosa.display.specshow(
+      librosa.amplitude_to_db(S_echo,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_echo)
+  img_mix = librosa.display.specshow(
+      librosa.amplitude_to_db(S_mix,
+                              ref=np.max),
+      x_axis='time', y_axis='hz', ax=ax_mix)
+
+  ax_stim.set_ylim(0, 4e3)
+  ax_echo.set_ylim(0, 4e3)
+  ax_mix.set_ylim(0, 4e3)
+  ax_stim.set_xlim(0, 1)
+  ax_echo.set_xlim(0, 1)
+  ax_mix.set_xlim(0, 1)
+    
+  ax_mix.hlines(f_max, 0, 1, 'red', ls = '--', lw = 1)
+  ax_stim.axline((0,0), (1,4e3), linewidth = 1, color = 'red', ls = '--')
+  ax_echo.axline((delay,0), (1+delay,4e3), linewidth = 1, color = 'red', ls = '--')
+
+  fig.suptitle('Delay = {:0.0f}ms Metadata: {:s} \n {:s}'.format(1e3 * delay, meta_comment, user_agent), size = 'small')
+  fig.set_size_inches(10, 3.5)
+
+  return fig
+
+#+end_src
+
+#+RESULTS:
+[[file:data/plots/i5cu_py.png]]
+
+
+* Pitch detection                                                        :#2:
+
+** Stimuli
+
+#+begin_src R
+  wav <- tuneR::sine(440, samp.rate = 48e3)
+  tuneR::writeWave(wav, './sounds/a4.wav')
+#+end_src
+
+#+RESULTS:
+
+
+#+RESULTS:
+
+** Front-end
+
+#+begin_src html
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Pitch detection unit test</title>
+    </head>
+    <body>
+      <h1>Pitch detection unit test</h1>
+      <div><a href=".">..</a></div>
+      <div id="test-container">
+        <button id="run_a4">Run A4</button>
+        <button id="run_chirp4_delay100">Run Chirp 4Hz/Delay 100 ms</button>
+        <div id="results"></div>
+        <canvas id="spectrogramCanvas"></canvas>
+      </div>
+      <script src="pitch-detect.js" type="module"></script>
+    </body>
+  </html>
+#+end_src
+
+#+begin_src js
+  import { AuditoryToolbox } from './AuditoryToolbox.js';
+
+  const auditory = new AuditoryToolbox();
+  const testContainer = document.getElementById('test-container');
+  const runButtonA4 = document.getElementById('run_a4');
+  const runButtonChirp4Delay100 = document.getElementById('run_chirp4_delay100');
+  const results = document.getElementById('results');
+  const canvas = document.getElementById('spectrogramCanvas');
+  let unitTestValue = null;
+
+  const runA4 = async () => {
+      let pitchTrack = await auditory.detectPitch('../sounds/a4.wav');
+      console.log(pitchTrack);
+      unitTestValue = pitchTrack.mode;
+      window.unitTestValue = unitTestValue;
+      results.innerText = `Actual pitch: 440Hz\nDetected pitch: ${Math.round(pitchTrack.mode * 100)/100}Hz`;
+      auditory.plotSpectrogram(pitchTrack, canvas, 800, 400);
+  };
+
+  const runChirp4Delay100 = async () => {
+      let pitchTrack = await auditory.fmcw('../sounds/chirp4_delay100.wav');
+      console.log(pitchTrack);
+      const sweep = 4e3;
+      const delay = 0.1;
+      const delayEstimate = 1e3*pitchTrack.mode/sweep;
+      unitTestValue = delayEstimate
+      window.unitTestValue = unitTestValue;
+      results.innerText = `Actual delay: 100 ms\nDetected delay: ${delayEstimate} ms`;
+      auditory.plotSpectrogram(pitchTrack, canvas, 800, 400);
+  };
+
+  runButtonA4.addEventListener('click', runA4);
+
+  runButtonChirp4Delay100.addEventListener('click', runChirp4Delay100)
+
+  export { unitTestValue };
+#+end_src
+
+To run I need to
+
+- [X] add a detectPitch method that returns a printable object (JSON)
+- [X] create the a4.wav file

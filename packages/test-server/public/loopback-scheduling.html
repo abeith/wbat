@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VirtualLoopback Scheduling Tests</title>
+  </head>
+  <body>
+    <h1>VirtualLoopback Scheduling Tests</h1>
+    <p>
+      These manual tests log scheduling details and sample-level offsets. They
+      are relevant to stimulus synchronisation assumptions rather than RTL.
+    </p>
+    <p>
+      Method summary: we embed a short Barker-13 pattern at the start and end of
+      the stimulus, record it via virtual loopback, and correlate the recording
+      against the known pattern to measure integer and sub-sample alignment.
+    </p>
+    <button id="test-absolute-tight">Absolute start/end (tight)</button>
+    <button id="test-absolute-prepared">Absolute start/end (prepared)</button>
+    <button id="test-relative">Delay + duration</button>
+    <button id="test-relative-long">Delay + duration (2s)</button>
+    <button id="test-quantized">Quantised start/end</button>
+    <button id="test-half-sample">Quantised + 0.5/fs</button>
+    <button id="test-past-duration">Tight start (keep duration)</button>
+    <button id="test-past-end">Tight start (keep endTime)</button>
+    <pre id="results"></pre>
+    <pre id="log"></pre>
+    <script type="module" src="/loopback-scheduling.js"></script>
+  </body>
+</html>

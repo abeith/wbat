@@ -1,0 +1,37 @@
+{
+  "name": "test-server",
+  "version": "0.0.1",
+  "description": "Node test server for Web-Based Auditory Toolbox",
+  "author": "Alistair Beith",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/server.js",
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "start": "nodemon .",
+    "build": "npm run lint && tsc && rollup -c",
+    "build:watch": "npm run build -- --watch",
+    "lint": "npm run format && eslint src --fix",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "dependencies": {
+    "@jspsych/plugin-audio-button-response": "^2.1.0",
+    "@jspsych/plugin-call-function": "^2.1.0",
+    "@jspsych/plugin-html-button-response": "^2.1.0",
+    "jspsych": "^8.2.1",
+    "multer": "^1.4.5-lts.1",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
+    "wbat": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.2",
+    "nodemon": "^3.1.9",
+    "rollup-plugin-postcss": "^4.0.2"
+  }
+}

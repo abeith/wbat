@@ -1,0 +1,26 @@
+/* Visit https://aka.ms/tsconfig to read more about this file */
+{
+  "compilerOptions": {
+    /* Projects */
+
+    /* Language and Environment */
+    "target": "ESNext" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
+
+    /* Modules */
+    "module": "ESNext",
+    "moduleResolution": "node",
+
+    /* JavaScript Support */
+
+    /* Emit */
+    "outDir": "dist",
+
+    /* Interop Constraints */
+    "allowSyntheticDefaultImports": true /* Allow 'import x from y' when a module doesn't have a default export. */,
+
+    /* Type Checking */
+    "strict": true
+
+    /* Completeness */
+  }
+}

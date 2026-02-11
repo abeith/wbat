@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Beith
+    given-names: Alistair
+    orcid: https://orcid.org/0000-0002-2260-4441
+title: "WBAT: Web-based Auditory Toolbox"
+version: 0.1.0
+date-released: 2026-02-11
