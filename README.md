@@ -44,8 +44,8 @@ This guide assumes that you have Node.js and npm installed on your system.
 Clone the repository to your local machine using:
 
 ```sh
-git clone https://github.com/abeith/web-based-auditory-toolbox.git
-cd web-based-auditory-toolbox
+git clone https://github.com/abeith/wbat.git
+cd wbat
 ```
 
 ### Step 2: Install dependencies

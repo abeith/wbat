@@ -4,7 +4,7 @@
   "description": "Tools for accurately timed auditory data collection in a browser",
   "author": "Alistair Beith",
   "license": "MIT",
-  "homepage": "https://abeith.github.io/web-based-auditory-toolbox",
+  "homepage": "https://abeith.github.io/wbat",
   "type": "module",
   "main": "dist/index.js",
   "files": [
