@@ -21,7 +21,7 @@ Record stimulus and response in the same AudioContext. If participants are not r
 
 ### Remote Latency Measurement
 
-Robust round-trip-latency (RTL) measurement. For experiments were participants *are* required to wear headphones, `latencyTest` blocks allow real-time, high-precision measurement of RTL.
+Robust round-trip-latency (RTL) measurement. For experiments where participants *are* required to wear headphones, `latencyTest` blocks allow real-time, high-precision measurement of RTL.
 
 ### AV Sync (Beta)
 
@@ -33,7 +33,7 @@ Not a developer, but want to try the tools out? Get in touch to let us know how 
 
 ## Usage
 
-For minimal examples of the core methods, see `packages/wbat/README.md`.
+For minimal examples of the core methods, see README in [packages/wbat](./packages/wbat/).
 
 ## Build
 
