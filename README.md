@@ -1,6 +1,6 @@
-![WBAT logo](./WBAT-logo.png)
+<img src="WBAT-logo.svg" alt="WBAT logo" width="50%">
 
-web-based-auditory-toolbox (WBAT) is a package of tools for conducting auditory experiments in a web browser. Web technologies change too fast for researchers to trust claims. With WBAT, instead of relying on performance claims, you have the tools to measure for yourself.
+The Web-Based Auditory Toolbox (WBAT) is a package of tools for conducting auditory experiments in a web browser. Web technologies change too fast for researchers to trust claims. With WBAT, instead of relying on performance claims, you have the tools to measure for yourself.
 
 ## Repository layout
 
